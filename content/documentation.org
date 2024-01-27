@@ -1,0 +1,225 @@
+#+TITLE: Création du blorg
+#+AUTHOR: Charles-Édouard Lizotte
+#+DATE: <2024-01-25>
+
+* L'objectif
+
+** Mise en contexte 
+J'adore le langage Org, je le trouve particulièrement efficace pour produire des notes, des agendas et des journaux.
+Voici quelques mois que je l'utilise dans le cadre de mon travail et j'aimerais maintenant créer moi-même un blog accessible pour tous.
+Par contre, peu de sites web de type blog apprécient le formatage du langage Org, c'est pourquoi je me suis mis en tête de moi-même en créer un.
+Ce document contient quelques notes importantes que j'ai prises au fil de mon parcours de création.
+
+** Non, mais concrétement...
+Nous allons publier (ou plutôt exporter) un fichier Org en fichier HTML dans le but de créer un site web.
+Lorsqu'on entend le mot « *publier »*, on parle généralement de transformer notre fichier *org* en fichier *HTML*.
+C'est ce que nous apprendrons à faire dans les prochaines minutes.
+
+* Architecture de fichiers
+Avant tout, nous avons besoin d'une forme d'architecture de gestion de nos publications.
+Celle proposée par [[https://www.youtube.com/watch?v=AfkrzFodoNw][la chaîne Youtube System Crafter]] fait la plus de sens :
++ *build.sh* : un scrip bash qui exécute la mise à jour de nos fichiers org en fichiers HTML à l'aide du fichier *build-site.el*. 
++ *build-site.el* : un code *elisp* qui s'assure d'exécuter *Emacs* en mode -Q pour publier nos fichiers.
++ Dossier */content* : où l'on retrouve le contenu du site web, comme les fichiers org ou la gabarits CSS.
+  + *content/index.org* : un fichier org représentant notre page principale.
++ Dossier */public* : Dossier des fichiers qui seront publiés vers le web (HTML, png, CSS).
+  Pour l'instant, on y retrouve que le fichier /index.org/.
+
+Au final, le résultat désiré devrait ressembler à l'arbre suivant : 
+#+begin_src sh
+.
+├── build.sh
+├── build-site.el
+├── content
+│   └── index.org
+├── css
+│   └── simple.css
+├── documentation.org
+└── public
+    ├── css
+    │   └── simple.css
+    └── index.html
+#+end_src
+
+Le fichier /build.sh/ est un exécutable bash qui met à jour notre site web en exécutant notre script elisp : 
+#+begin_src bash
+#!/bin/sh
+emacs -Q --script build-site.el
+#+end_src
+
+* Création d'une configuration de publication web  
+Un fois nos scripts de base réalisés, on peut créer une configuration de publication dans le script /build-site.el/.
+Commençons par une configuration de publication de nos fichiers HTML.
+Les variables de publication devraient ressembler à
+#+begin_src elisp
+;; Define the publishing project
+(setq org-publish-project-alist
+      (list
+       (list "my-org-site"
+   	     :recursive t
+   	     :base-directory "./content"
+   	     :publishing-directory "./public"
+   	     :publishing-function 'org-html-publish-to-html)))
+
+;; Generate the site output
+(org-publish-all t)
+(message "Build complete!")
+#+end_src
+À la dernière ligne, la fonction de publication est exécutée de sorte à exporter les nouveaux fichiers HTML dans le dossier /./public/. 
+
+* Un aperçu du site web en ligne
+Pour voir un aperçu de notre site web *en ligne*, il existe un module Emacs qui peut abriter notre site sur notre machine, le temps de le tester.
+Ce module s'appelle [[https://github.com/skeeto/emacs-web-server/blob/master/simple-httpd.el][simple-httpsd]] et il s'installe à l'aide de MELPA, donc avec la commande « *M-x package-install* » ou en mettant la ligne de code suiante
+#+begin_src elisp
+(use-package simple-httpd
+  :ensure t)
+#+end_src
+Si ça ne marche pas, il est pertinent de mettre à jour la liste des modules à l'aide de la commande « *M-x package-refresh-contents* ».
+
+Finalement, on roule la commande « *M-x httpd-serve-directory* ».
+Dans la commande, il est important de choisir le dossier _/public_, car c'est là qu'on retrouve tous nos fichiers de type html.
+Ensuite, on peut visiter le site web en allant au http://localhost:8080.
+
+*** Aperçu d'un site utilisant des fichiers CSS
+Il faut s'assurer que nos fichiers CSS sont dans le répertoire mis en ligne.
+Dans notre cas, on retrouve tous les fichiers /CSS/ dans le dossier _./public/css_.
+S'ils ne sont pas là, le navigateur web ne pourra tout simplement pas les trouver. 
+
+* Création d'un visuel pour le site web
+
+** Améliorations de base 
+Déjà, on peut améliorer notre fichier de configuration (/build-site.el/) en copiant quelques lignes de code dans la liste des configurations. 
+#+begin_src elisp
+:with-author nil        ;; don't include author name
+:with-creator t         ;; include Emacs and Org version in footer
+:with-toc t             ;; include table of contents
+:section-numbers nil    ;; don't include section numbers
+:time-stamp-file nil))) ;; don't include time stamp in file
+#+end_src
+*** Retirer le bouton « Validate »
+Il y a un bouton inutile, nous allons le retirer en renommant la variable /org-html-validation-link/ :
+#+begin_src elisp
+(setq org-html-validation-link nil)
+#+end_src
+
+** Les variables de publication
+Pour connaître toutes les variables de publication, il est intéressant d'utiliser la commande d'aide classique *« C-h v* » directement sur la fonction « *org-publish-project-alist* » et de faire « *Tab* » pour avoir une liste des variables disponibles.
+C'est essentiellement la même chose que faire « *M-x describle-variable* ».
+La plupart des variables commencent par « *org-export-* », donc c'est assez simple de les identifier.
+Avec « *Enter* » , on peut accéder à la documentation complète de la fonction.
+
+** Simple CSS
+Ok, le texte est là, mais le reste du site web est hideux sur le plan visuel.
+Heureusement, quelqu'un a codé un script de style CSS (/Cascading Style Sheet/) extrêmement compacte, soit une base sur laquelle il est aisé de construire quelque chose d'intéressant.
+Ça s'appelle [[https://simplecss.org/][simple.css]] et ça vaut la peine de l'utiliser pour commencer.
+Pour se faire, il suffit de copier les lignes suivantes dans notre _/build-site.el_ : 
+#+begin_src elisp
+;; Customize the HTML output
+(setq org-html-validation-link nil            ;; Don't show validation link
+      org-html-head-include-scripts nil       ;; Use our own scripts
+      org-html-head-include-default-style nil ;; Use our own styles
+      org-html-head "<link rel=\"stylesheet\" href=\"https://cdn.simplecss.org/simple.min.css\" />")
+#+end_src
+Le résultat est immédiat et surprenant.
+
+** Inclure d'autres gabarits CSS
+En premier lieu, il faut télécharger un gabarit CSS.
+[[https://thomasf.github.io/solarized-css/][Solarized CSS]] offre une belle alternative pour débuter, par exemple.
+Une fois le téléchargement réalisé, il faut modifier les paramètres d'exportation de sorte à prendre notre gabarit CSS. 
+#+begin_src elisp
+;; Customize the HTML output
+   (setq org-html-validation-link nil             ;; Don't show validation link
+      org-html-head-include-scripts nil           ;; Use our own scripts
+      org-html-head-include-default-style nil     ;; Use our own styles
+      org-html-head "<link rel=\"stylesheet\" href=\"./css/stylesheet.css\" />")  ;; Où trouver le fichier CSS
+#+end_src
+Mais, pour que ça fonctionne en ligne, il fuat impérativement que les gabarits CSS se retrouvent aussi dans le dossier exporté en ligne.
+C'est pourquoi on doit eux-aussi les exporter dans le dossier /./public/css/.
+Il faut donc dire à notre fonction de publication d'exporter les fichiers CSS dans le dossier /./public/. 
+Pour faire ça, on modifie nos variables de publication pour la fonction « *org-publish-attachment* ».
+Grossièrement, on ajoute une nouvelle variable de publication appelée « *org-css* » qui va faire ça.
+#+begin_src elisp
+;; Define the publishing project
+(setq org-publish-project-alist
+      (list
+       (list "org-blog"
+	     :recursive t
+	     :base-directory "./content"
+	     :publishing-directory "./public"
+	     :base-extension "org"
+	     :publishing-function 'org-html-publish-to-html
+	     :with-author t              ;; don't include author name
+	     :with-creator t             ;; include Emacs and Org version in footer
+	     :with-toc nil               ;; include table of contents
+	     :section-numbers nil        ;; don't include section numbers
+	     :time-stamp-file nil)       ;; don't include time stamp in file
+       
+       ;; On publie les fichier CSS en css dans ./public/css
+       (list "org-css"
+             :base-directory "css/"
+             :base-extension "css"
+             :publishing-directory "public/css"
+             :recursive t
+             :publishing-function 'org-publish-attachment
+             )))
+#+end_src
+Tout cela pour s'assurer que les fichiers CSS seront accessibles pour le navigateur web, comme proposé dans le [[https://kansi.gitlab.io/blog_setup_with_emacs.html][blog de Vanshdeep Singh]].
+
+* Aller plus loin
+
+** Création d'une « sitemap » simple
+Un bon [[https://opensource.com/article/20/3/blog-emacs][tutoriel du site opensource.com]] nous renseigne sur l'utilisation d'une /sitemap/.
+Grossièrement, on peut se débarasser du fichier d'index pour laisser notre fonction de publication s'en occuper.
+Pour se faire, on supprime le fichier d'index et l'on rajoute les variables
+#+begin_src elisp
+	     ;; Publication index
+           :auto-sitemap t
+	     :sitemap-title "Index du blogue"
+	     :sitemap-filename "index.org"
+	     :sitemap-style 'list
+	     :author "Charles-Édouard Lizotte"
+	     :email "charlesedouardlizotte@protonmail.com")
+#+end_src
+dans la liste des variables de org-blog.
+
+** Création d'une fonction pour la « sitemap »
+Dans le blogue parfait, ma page d'/indexe/ illustrerait des liens, ainsi qu'une date de création, de sorte à trier de maniètre chronologique nos textes.
+pour se faire, il faut modifier la variable *:sitemap-style*.
+Par contre, ça ne fonctionne pas, car Org est en constante modification et il se peut que la variable soit légèrement désuette si on la transforme telle que
+#+begin_src elisp
+  :sitemap-style "%d - %t"
+#+end_src
+par exemple.
+
+Grossièrement, la [[https://orgmode.org/manual/Site-map.html][documentation de Org-mode sur la /sitemap]] donne très peu d'information sur la création d'une belle /sitemap/ -- même chose du côté de la [[https://doc.endlessparentheses.com/Var/org-publish-project-alist.html][documentation de Endless Parentheses]]. 
+De son côté, le [[https://ogbe.net/blog/org_custom_sitemap][blogue de Dennis Ogbe]] offre beaucoup d'information sur la structure, mais je n'y comprend absolument rien, faute de talent.
+C'est pourquoi j'ai cherché une solution plus simple et c'est ce que j'ai trouvé du côté du [[https://miikanissi.com/blog/website-with-emacs/][blogue de Miikanissi]] et que j'ai un peu modifiée :
+#+begin_src elisp
+(defun my-sitemap-func (title list)
+  "Sitemap generation function."
+  (concat "#+Title:"
+	  title
+	  "\n\n"
+	  (org-list-to-subtree list)))
+#+end_src
+La fonction de notre /site-map/ devrait sortir une liste de lien Org et un titre.
+
+[[https://pank.eu/blog/blog-setup.html][Rasmus Pank et son blogue]] arrivent en sauveurs :
+Au fond, on est en train de *créer* un fichier d'index, donc la fonction de *:sitemap-function* devrait donner du texte.
+
+
+
+
+* Ressources et remerciements
+
+*** Création d'une architecture Org et publication HTML
++ [[https://systemcrafters.net/publishing-websites-with-org-mode/building-the-site/][System Crafter]]
+  
+*** Gabarit HTML de base
++ [[https://simplecss.org/][Simple.css]]
++ [[https://thomasf.github.io/solarized-css/][Solarized CSS]]
+
+*** Gérer la fonction de publication
++ [[https://kansi.gitlab.io/blog_setup_with_emacs.html][Blog de Vanshdeep Singh]]
+
++ 
