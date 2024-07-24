@@ -44,7 +44,6 @@
 
 
 
-
 ;; Define the publishing project
 ;; > C'est en fait une liste de configuration pour différents projets.
 ;;   Par exemple, on exporte juste la config de "org-blog" ici.
